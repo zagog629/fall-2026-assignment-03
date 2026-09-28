@@ -94,6 +94,29 @@ export function optionalString(
   return value;
 }
 
+/**
+ * Reads a required positive integer field that fits in a Postgres `integer`.
+ * Rejects strings, floats, zero, negatives and out-of-range values with a 400.
+ */
+export function requiredPositiveInt(
+  body: Record<string, unknown>,
+  field: string,
+): number {
+  const value = body[field];
+  if (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= INT4_MAX
+  ) {
+    return value;
+  }
+  throw new HttpError(
+    400,
+    `"${field}" is required and must be a positive integer`,
+  );
+}
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Reads a required email field. Throws 400 if missing or not shaped like an email. */
