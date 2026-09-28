@@ -7,6 +7,7 @@ import {
   updateTicketStatus,
 } from '../dal/tickets.js';
 import { getUserById } from '../dal/users.js';
+import { getTotalHoursForTicket, insertTimeLog } from '../dal/timeLogs.js';
 import { HttpError, asyncHandler } from '../utils/http.js';
 import {
   asObject,
@@ -15,6 +16,7 @@ import {
   optionalString,
   parseId,
   parseStatus,
+  requiredPositiveInt,
   requiredString,
 } from '../utils/validation.js';
 
@@ -95,8 +97,49 @@ router.patch(
   }),
 );
 
-// TODO: Student implementation - Part 2: Time Log Routes
-// POST /tickets/:id/time
-// GET /tickets/:id/time
+// POST /tickets/:id/time - log hours against a ticket from { hours };
+// user_id comes from the X-User-Id header
+router.post(
+  '/:id/time',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const ticketId = parseId(req.params.id);
+    const body = asObject(req.body);
+    const hours = requiredPositiveInt(body, 'hours');
+
+    const userId: number = res.locals.userId;
+    const user = await getUserById(userId);
+    if (!user) {
+      throw new HttpError(401, 'X-User-Id does not match an existing user');
+    }
+
+    const ticket = fitsInInt4(ticketId)
+      ? await getTicketById(ticketId)
+      : undefined;
+    if (!ticket) {
+      throw new HttpError(404, 'Ticket not found');
+    }
+
+    const timeLog = await insertTimeLog(ticketId, userId, hours);
+    res.status(201).json(timeLog);
+  }),
+);
+
+// GET /tickets/:id/time - total hours logged against a ticket (0 if none)
+router.get(
+  '/:id/time',
+  asyncHandler(async (req, res) => {
+    const ticketId = parseId(req.params.id);
+    const ticket = fitsInInt4(ticketId)
+      ? await getTicketById(ticketId)
+      : undefined;
+    if (!ticket) {
+      throw new HttpError(404, 'Ticket not found');
+    }
+
+    const totalHours = await getTotalHoursForTicket(ticketId);
+    res.status(200).json({ ticket_id: ticketId, total_hours: totalHours });
+  }),
+);
 
 export default router;
